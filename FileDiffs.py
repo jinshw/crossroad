@@ -483,7 +483,13 @@ class FileDiffs(QWidget, Ui_diffs):
 
             rightObjectsList = self.rightRoot.xpath("//OpenDriveData/road[@id='" + roadId + "']/objects")
 
-            rightObjectsList[0].append(leftObjectList[0])
+            if len(rightObjectsList) == 0:# right 端没有objects节点
+                objects = etree.SubElement(roadList[0], "objects")
+                objects.append(leftObjectList[0])
+            else:
+                rightObjectsList[0].append(leftObjectList[0])
+
+            # rightObjectsList[0].append(leftObjectList[0])
 
     def replaceAddToXML(self, roadId, child):
         id = child["id"]
