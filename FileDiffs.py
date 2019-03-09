@@ -511,7 +511,11 @@ class FileDiffs(QWidget, Ui_diffs):
             leftObjectList = self.leftRoot.xpath("//OpenDRIVE/road[@id='" + roadId + "']/objects/object[@id='" +
                                                  id + "'and @type='" + type + "' and @name='" + name + "']")
             rightObjectsList = self.rightRoot.xpath("//OpenDriveData/road[@id='" + roadId + "']/objects")
-            rightObjectsList[0].append(leftObjectList[0])
+            if len(rightObjectsList) == 0:# right 端没有objects节点
+                objects = etree.SubElement(roadList[0], "objects")
+                objects.append(leftObjectList[0])
+            else:
+                rightObjectsList[0].append(leftObjectList[0])
 
         elif len(objectList) > 0 and len(roadList) == 1:  # id|name|type 相同 替换
             leftObjectList = self.leftRoot.xpath("//OpenDRIVE/road[@id='" + roadId + "']/objects/object[@id='" +
