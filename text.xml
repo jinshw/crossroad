@@ -1,0 +1,12 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<root xmlns:xsi="http://b.c/d" xsiinteresting="totally">
+  <child1 interesting="totally">TEXT</child1>
+  <child2 name="myattr1" auto="myattr2">
+    <child3>TEXT</child3>
+    <child4>TEXT</child4>
+    <child5>
+      <child6>TEXT</child6>
+      <child7>TEXT</child7>
+    </child5>
+  </child2>
+</root>
