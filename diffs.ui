@@ -29,9 +29,9 @@
   <widget class="QRadioButton" name="replaceRadioButton">
    <property name="geometry">
     <rect>
-     <x>360</x>
+     <x>340</x>
      <y>20</y>
-     <width>141</width>
+     <width>101</width>
      <height>16</height>
     </rect>
    </property>
@@ -339,6 +339,19 @@
      <width>181</width>
      <height>20</height>
     </rect>
+   </property>
+  </widget>
+  <widget class="QRadioButton" name="interfaceReplaceAddRadioButton">
+   <property name="geometry">
+    <rect>
+     <x>480</x>
+     <y>20</y>
+     <width>141</width>
+     <height>16</height>
+    </rect>
+   </property>
+   <property name="text">
+    <string>路口替换和新增</string>
    </property>
   </widget>
  </widget>

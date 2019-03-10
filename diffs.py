@@ -16,7 +16,7 @@ class Ui_diffs(object):
         self.retainRadioButton.setGeometry(QtCore.QRect(50, 20, 141, 16))
         self.retainRadioButton.setObjectName("retainRadioButton")
         self.replaceRadioButton = QtWidgets.QRadioButton(diffs)
-        self.replaceRadioButton.setGeometry(QtCore.QRect(360, 20, 141, 16))
+        self.replaceRadioButton.setGeometry(QtCore.QRect(340, 20, 101, 16))
         self.replaceRadioButton.setObjectName("replaceRadioButton")
         self.leftOpenBT = QtWidgets.QPushButton(diffs)
         self.leftOpenBT.setGeometry(QtCore.QRect(480, 60, 75, 23))
@@ -78,6 +78,9 @@ class Ui_diffs(object):
         self.rightRoadidLE = QtWidgets.QLineEdit(diffs)
         self.rightRoadidLE.setGeometry(QtCore.QRect(1260, 120, 181, 20))
         self.rightRoadidLE.setObjectName("rightRoadidLE")
+        self.interfaceReplaceAddRadioButton = QtWidgets.QRadioButton(diffs)
+        self.interfaceReplaceAddRadioButton.setGeometry(QtCore.QRect(480, 20, 141, 16))
+        self.interfaceReplaceAddRadioButton.setObjectName("interfaceReplaceAddRadioButton")
 
         self.retranslateUi(diffs)
         QtCore.QMetaObject.connectSlotsByName(diffs)
@@ -113,4 +116,5 @@ class Ui_diffs(object):
         self.readRightBT.setText(_translate("diffs", "重新读取"))
         self.leftFilterBT.setText(_translate("diffs", "筛选"))
         self.rightFilterBT.setText(_translate("diffs", "筛选"))
+        self.interfaceReplaceAddRadioButton.setText(_translate("diffs", "路口替换和新增"))
 

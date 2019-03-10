@@ -27,6 +27,7 @@ class FileDiffs(QWidget, Ui_diffs):
         self.bg.addButton(self.retainRadioButton, 1)
         self.bg.addButton(self.replaceRadioButton, 2)
         self.bg.addButton(self.replaceAddRadioButton, 3)
+        self.bg.addButton(self.interfaceReplaceAddRadioButton, 4)
         self.bg.buttonClicked.connect(self.btnstate)
 
         self.initTree()
@@ -216,8 +217,12 @@ class FileDiffs(QWidget, Ui_diffs):
             roadNote = QTreeWidgetItem(self.rightTreeWidget)
             roadNote.setText(0, id)
             roadNote.setCheckState(0, 0)
+            if self.bg.checkedId() == 4:
+                objectList = self.rightRoot.xpath(
+                    "//OpenDriveData/junction/links/link[@id='" + id + "']/objects/object")
+            else:
+                objectList = self.rightRoot.xpath("//OpenDriveData/road[@id='" + id + "']/objects/object")
 
-            objectList = self.rightRoot.xpath("//OpenDriveData/road[@id='" + id + "']/objects/object")
             for objectIndex in range(0, len(objectList)):
                 object = objectList[objectIndex]
                 objectId = object.xpath("@id")[0]
@@ -270,10 +275,17 @@ class FileDiffs(QWidget, Ui_diffs):
         filterStr = self.leftRoadidLE.text().strip()
         root = self.leftRoot
         self.leftRoadList = []
-        if filterStr == "":
-            roadEleList = root.xpath("//OpenDRIVE/road")
+
+        junctionStr = ""
+        if self.bg.checkedId() == 4:
+            junctionStr = "@junction != '-1'"
         else:
-            roadEleList = root.xpath("//OpenDRIVE/road[@id='" + filterStr + "']")
+            junctionStr = "@junction = '-1'"
+
+        if filterStr == "":
+            roadEleList = root.xpath("//OpenDRIVE/road[" + junctionStr + "]")
+        else:
+            roadEleList = root.xpath("//OpenDRIVE/road[@id='" + filterStr + "' and " + junctionStr + "]")
 
         for i in range(0, len(roadEleList)):
             roadEle = roadEleList[i]
@@ -284,10 +296,17 @@ class FileDiffs(QWidget, Ui_diffs):
         filterStr = self.rightRoadidLE.text().strip()
         root = self.rightRoot
         self.rightRoadList = []
-        if filterStr == "":
-            roadEleList = root.xpath("//OpenDriveData/road")
+
+        if self.bg.checkedId() == 4:
+            if filterStr == "":
+                roadEleList = root.xpath("//OpenDriveData/junction/links/link")
+            else:
+                roadEleList = root.xpath("//OpenDriveData/junction/links/link[@id='" + filterStr + "']")
         else:
-            roadEleList = root.xpath("//OpenDriveData/road[@id='" + filterStr + "']")
+            if filterStr == "":
+                roadEleList = root.xpath("//OpenDriveData/road")
+            else:
+                roadEleList = root.xpath("//OpenDriveData/road[@id='" + filterStr + "']")
 
         for i in range(0, len(roadEleList)):
             roadEle = roadEleList[i]
@@ -404,6 +423,13 @@ class FileDiffs(QWidget, Ui_diffs):
                 QMessageBox.information(self, "温馨提示", "请选择需要执行的记录！", QMessageBox.Yes, QMessageBox.Yes)
                 return
             self.replaceAddData()
+        elif self.bg.checkedId() == 4:
+            # 获取左侧数据
+            self.getLeftSelectedTreeDataAction()
+            if len(self.leftSelectDatas) == 0:
+                QMessageBox.information(self, "温馨提示", "请选择需要执行的记录！", QMessageBox.Yes, QMessageBox.Yes)
+                return
+            self.interfaceReplaceAddData()
 
         try:
             # 节点转为tree对象
@@ -437,6 +463,13 @@ class FileDiffs(QWidget, Ui_diffs):
             for cindex in range(0, len(childList)):
                 child = childList[cindex]
                 self.replaceAddToXML(roadId, child)
+
+    def interfaceReplaceAddData(self):
+        for roadId, childList in self.leftSelectDatas.items():
+            print(roadId, childList)
+            for cindex in range(0, len(childList)):
+                child = childList[cindex]
+                self.interfaceReplaceAddToXML(roadId, child)
 
     def rightDeleteSelectedNote(self):
         for roadId, childList in self.rightSelectDatas.items():
@@ -483,7 +516,7 @@ class FileDiffs(QWidget, Ui_diffs):
 
             rightObjectsList = self.rightRoot.xpath("//OpenDriveData/road[@id='" + roadId + "']/objects")
 
-            if len(rightObjectsList) == 0:# right 端没有objects节点
+            if len(rightObjectsList) == 0:  # right 端没有objects节点
                 objects = etree.SubElement(roadList[0], "objects")
                 objects.append(leftObjectList[0])
             else:
@@ -517,7 +550,7 @@ class FileDiffs(QWidget, Ui_diffs):
             leftObjectList = self.leftRoot.xpath("//OpenDRIVE/road[@id='" + roadId + "']/objects/object[@id='" +
                                                  id + "'and @type='" + type + "' and @name='" + name + "']")
             rightObjectsList = self.rightRoot.xpath("//OpenDriveData/road[@id='" + roadId + "']/objects")
-            if len(rightObjectsList) == 0:# right 端没有objects节点
+            if len(rightObjectsList) == 0:  # right 端没有objects节点
                 objects = etree.SubElement(roadList[0], "objects")
                 objects.append(leftObjectList[0])
             else:
@@ -527,6 +560,45 @@ class FileDiffs(QWidget, Ui_diffs):
             leftObjectList = self.leftRoot.xpath("//OpenDRIVE/road[@id='" + roadId + "']/objects/object[@id='" +
                                                  id + "'and @type='" + type + "' and @name='" + name + "']")
             rightObjectsList = self.rightRoot.xpath("//OpenDriveData/road[@id='" + roadId + "']/objects")
+            rightObjectsList[0].remove(objectList[0])
+            rightObjectsList[0].append(leftObjectList[0])
+
+    def interfaceReplaceAddToXML(self, roadId, child):
+        id = child["id"]
+        type = child["type"]
+        name = child["name"]
+        s = child["s"]
+        t = child["t"]
+        zOffset = child["zOffset"]
+        if self.rightRoot == None:
+            QMessageBox.information(self, "温馨提示", "请先选XML文件！", QMessageBox.Yes, QMessageBox.Yes)
+            return
+
+        if self.leftRoot == None:
+            QMessageBox.information(self, "温馨提示", "请先选xodr文件！", QMessageBox.Yes, QMessageBox.Yes)
+            return
+
+        # 从xml文件中查询是否存在该条数据
+        roadList = self.rightRoot.xpath("//OpenDriveData/junction/links/link[@id='" + roadId + "']")
+        objectList = self.rightRoot.xpath(
+            "//OpenDriveData/junction/links/link[@id='" + roadId + "']/objects/object[@id='" +
+            id + "'and @type='" + type + "' and @name='" + name + "']")
+
+        # xml文件中没有该条记录
+        if len(objectList) == 0 and len(roadList) == 1:  # id|name|type 不同 新增
+            leftObjectList = self.leftRoot.xpath("//OpenDRIVE/road[@id='" + roadId + "']/objects/object[@id='" +
+                                                 id + "'and @type='" + type + "' and @name='" + name + "']")
+            rightObjectsList = self.rightRoot.xpath("//OpenDriveData/junction/links/link[@id='" + roadId + "']/objects")
+            if len(rightObjectsList) == 0:  # right 端没有objects节点
+                objects = etree.SubElement(roadList[0], "objects")
+                objects.append(leftObjectList[0])
+            else:
+                rightObjectsList[0].append(leftObjectList[0])
+
+        elif len(objectList) > 0 and len(roadList) == 1:  # id|name|type 相同 替换
+            leftObjectList = self.leftRoot.xpath("//OpenDRIVE/road[@id='" + roadId + "']/objects/object[@id='" +
+                                                 id + "'and @type='" + type + "' and @name='" + name + "']")
+            rightObjectsList = self.rightRoot.xpath("//OpenDriveData/junction/links/link[@id='" + roadId + "']/objects")
             rightObjectsList[0].remove(objectList[0])
             rightObjectsList[0].append(leftObjectList[0])
 
@@ -670,7 +742,13 @@ class FileDiffs(QWidget, Ui_diffs):
             roadNote.setText(0, id)
             roadNote.setCheckState(0, 0)
 
-            objectList = self.rightRoot.xpath("//OpenDriveData/road[@id='" + id + "']/objects/object")
+            if  self.bg.checkedId() == 4:
+                objectList = self.rightRoot.xpath("//OpenDriveData/junction/links/link[@id='" + id + "']/objects/object")
+            else:
+                objectList = self.rightRoot.xpath("//OpenDriveData/road[@id='" + id + "']/objects/object")
+
+
+
             for objectIndex in range(0, len(objectList)):
                 object = objectList[objectIndex]
                 objectId = object.xpath("@id")[0]
