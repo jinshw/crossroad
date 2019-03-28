@@ -1,3 +1,5 @@
+import configparser
+import os
 import sys
 
 from PyQt5 import QtWidgets, QtCore
@@ -13,11 +15,16 @@ class FileDiffs(QWidget, Ui_diffs):
     def __init__(self):
         super(FileDiffs, self).__init__()
         self.setupUi(self)
+        self.initConfig()
         self.initUI()
-
         self.leftRoot = None
         self.rightRoot = None
         self.rightPath = ""
+
+    def initConfig(self):
+        self.config = self.readConfig()
+        object_name_type = self.config.get("object", "object_name_type")
+        self.objectNameList = object_name_type.split("|")
 
     def initUI(self):
         # 保留原有数据 为默认
@@ -30,6 +37,9 @@ class FileDiffs(QWidget, Ui_diffs):
         self.bg.addButton(self.interfaceReplaceAddRadioButton, 4)
         self.bg.buttonClicked.connect(self.btnstate)
 
+        # self.objectNameComboBox.setEditable(True)
+        self.objectNameComboBox.addItems(self.objectNameList)
+
         self.initTree()
         self.initAction()
 
@@ -39,11 +49,14 @@ class FileDiffs(QWidget, Ui_diffs):
         self.leftClearBT.clicked.connect(self.clearLeftAll)
         self.rightClearBT.clicked.connect(self.clearRightAll)
         self.leftOpenBT.clicked.connect(self.leftOpenAction)
+        self.leftXMLOpenBT.clicked.connect(self.leftXMLOpenAction)
         self.rightOpenBT.clicked.connect(self.rightOpenAction)
         self.runBT.clicked.connect(self.runAction)
+        self.runXMLBT.clicked.connect(self.runXMLAction)
         self.readRightBT.clicked.connect(self.readRightBTAction)
         self.rightRemoveBT.clicked.connect(self.rightRemoveAction)
         self.leftFilterBT.clicked.connect(self.leftFilterBTAction)
+        self.leftXMLFilterBT.clicked.connect(self.leftXMLFilterAction)
         self.rightFilterBT.clicked.connect(self.rightFilterBTAction)
 
     def initTree(self):
@@ -160,6 +173,12 @@ class FileDiffs(QWidget, Ui_diffs):
         print(self.leftPath, self.leftRoot)
         self.readLeftXML()
 
+    def leftXMLOpenAction(self):
+        self.leftPath, self.leftRoot = self.openAction()
+        if self.leftPath == "":
+            return
+        self.readLeftXMLByTwo()
+
     def readLeftXML(self):
         self.leftPathLE.setText(self.leftPath)
         self.getLeftRoadList()
@@ -173,7 +192,57 @@ class FileDiffs(QWidget, Ui_diffs):
             roadNote.setCheckState(0, 0)
             # roadNote.setCheckState(0, Qt.Checked)
 
-            objectList = self.leftRoot.xpath("//OpenDRIVE/road[@id='" + id + "']/objects/object")
+            objectNameSelected = self.objectNameComboBox.currentText()
+            objectNameSelectedType = objectNameSelected.split(",")[0].strip()
+            if objectNameSelectedType == 'ALL':
+                objectList = self.leftRoot.xpath("//OpenDRIVE/road[@id='" + id + "']/objects/object")
+            else:
+                objectList = self.leftRoot.xpath(
+                    "//OpenDRIVE/road[@id='" + id + "']/objects/object[contains(@name ,'" + objectNameSelectedType + "')]")
+
+            for objectIndex in range(0, len(objectList)):
+                object = objectList[objectIndex]
+                objectId = object.xpath("@id")[0]
+                objectType = object.xpath("@type")[0]
+                objectName = object.xpath("@name")[0]
+                s = object.xpath("@s")[0]
+                t = object.xpath("@t")[0]
+                zOffset = object.xpath("@zOffset")[0]
+
+                # 子节点
+                child1 = QTreeWidgetItem()
+                child1.setText(0, objectId)
+                child1.setText(1, objectType)
+                child1.setText(2, objectName)
+                child1.setText(3, s)
+                child1.setText(4, t)
+                child1.setText(5, zOffset)
+                child1.setCheckState(0, 0)
+                # child1.setCheckState(0, Qt.Checked)
+                roadNote.addChild(child1)
+            self.leftTreeWidget.addTopLevelItem(roadNote)
+            self.leftTreeWidget.collapseAll()
+
+    def readLeftXMLByTwo(self):
+        self.leftXMLPathLE.setText(self.leftPath)
+        self.getLeftXMLRoadList()
+
+        self.leftTreeWidget.clear()
+        self.leftRoadList.sort()
+        for i in range(0, len(self.leftRoadList)):
+            id = self.leftRoadList[i]
+            roadNote = QTreeWidgetItem(self.leftTreeWidget)
+            roadNote.setText(0, id)
+            roadNote.setCheckState(0, 0)
+            # roadNote.setCheckState(0, Qt.Checked)
+            objectNameSelected = self.objectNameComboBox.currentText()
+            objectNameSelectedType = objectNameSelected.split(",")[0].strip()
+            if objectNameSelectedType == 'ALL':
+                objectList = self.leftRoot.xpath("//OpenDriveData/road[@id='" + id + "']/objects/object")
+            else:
+                objectList = self.leftRoot.xpath(
+                    "//OpenDriveData/road[@id='" + id + "']/objects/object[contains(@name ,'" + objectNameSelectedType + "')]")
+
             for objectIndex in range(0, len(objectList)):
                 object = objectList[objectIndex]
                 objectId = object.xpath("@id")[0]
@@ -217,11 +286,23 @@ class FileDiffs(QWidget, Ui_diffs):
             roadNote = QTreeWidgetItem(self.rightTreeWidget)
             roadNote.setText(0, id)
             roadNote.setCheckState(0, 0)
+
+            objectNameSelected = self.objectNameComboBox.currentText()
+            objectNameSelectedType = objectNameSelected.split(",")[0].strip()
+
             if self.bg.checkedId() == 4:
-                objectList = self.rightRoot.xpath(
-                    "//OpenDriveData/junction/links/link[@id='" + id + "']/objects/object")
+                if objectNameSelectedType == 'ALL':
+                    objectList = self.rightRoot.xpath(
+                        "//OpenDriveData/junction/links/link[@id='" + id + "']/objects/object")
+                else:
+                    objectList = self.rightRoot.xpath(
+                        "//OpenDriveData/junction/links/link[@id='" + id + "']/objects/object[contains(@name ,'" + objectNameSelectedType + "')]")
             else:
-                objectList = self.rightRoot.xpath("//OpenDriveData/road[@id='" + id + "']/objects/object")
+                if objectNameSelectedType == 'ALL':
+                    objectList = self.rightRoot.xpath("//OpenDriveData/road[@id='" + id + "']/objects/object")
+                else:
+                    objectList = self.rightRoot.xpath(
+                        "//OpenDriveData/road[@id='" + id + "']/objects/object[contains(@name ,'" + objectNameSelectedType + "')]")
 
             for objectIndex in range(0, len(objectList)):
                 object = objectList[objectIndex]
@@ -286,6 +367,21 @@ class FileDiffs(QWidget, Ui_diffs):
             roadEleList = root.xpath("//OpenDRIVE/road[" + junctionStr + "]")
         else:
             roadEleList = root.xpath("//OpenDRIVE/road[@id='" + filterStr + "' and " + junctionStr + "]")
+
+        for i in range(0, len(roadEleList)):
+            roadEle = roadEleList[i]
+            id = roadEle.xpath("@id")[0]
+            self.leftRoadList.append(id)
+
+    def getLeftXMLRoadList(self):
+        filterStr = self.leftRoadidLE.text().strip()
+        root = self.leftRoot
+        self.leftRoadList = []
+
+        if filterStr == "":
+            roadEleList = root.xpath("//OpenDriveData/road")
+        else:
+            roadEleList = root.xpath("//OpenDriveData/road[@id='" + filterStr + "']")
 
         for i in range(0, len(roadEleList)):
             roadEle = roadEleList[i]
@@ -450,12 +546,90 @@ class FileDiffs(QWidget, Ui_diffs):
             print('错误信息：{0}'.format(err))
             QMessageBox.information(self, "温馨提示", "生成xml失败！", QMessageBox.Yes, QMessageBox.Yes)
 
+    def runXMLAction(self):
+        if self.leftRoot == None or self.leftRoot == "":
+            QMessageBox.information(self, "温馨提示", "请先选xodr文件！", QMessageBox.Yes, QMessageBox.Yes)
+            return
+        if self.rightRoot == None or self.rightRoot == "":
+            QMessageBox.information(self, "温馨提示", "请先选XML文件！", QMessageBox.Yes, QMessageBox.Yes)
+            return
+
+        # 获取xodr（左侧）中objects数据
+        parser = etree.XMLParser(remove_blank_text=True)
+        xml = etree.parse(self.leftPath, parser)
+        self.leftRoot = xml.getroot()  # 获取根节点
+
+        parserRight = etree.XMLParser(remove_blank_text=True)
+        xmlRight = etree.parse(self.rightPath, parserRight)
+        self.rightRoot = xmlRight.getroot()  # 获取根节点
+
+        # 保留原有数据和新增
+        if self.bg.checkedId() == 1:  # 保留原有数据
+            print(self.bg.checkedId())
+            # 获取左侧数据
+            self.getLeftSelectedTreeDataAction()
+            if len(self.leftSelectDatas) == 0:
+                QMessageBox.information(self, "温馨提示", "请选择需要新增的记录！", QMessageBox.Yes, QMessageBox.Yes)
+                return
+
+            self.retainXMLData()
+
+        # 替换全部数据
+        elif self.bg.checkedId() == 2:  # 替换原有数据
+            print(self.bg.checkedId())
+            self.getLeftAllTreeDataAction()
+            try:
+                self.replaceXMLData()
+            except Exception as err:
+                print('错误信息：{0}'.format(err))
+
+        elif self.bg.checkedId() == 3:  # 替换和新增
+            # 获取左侧数据
+            self.getLeftSelectedTreeDataAction()
+            if len(self.leftSelectDatas) == 0:
+                QMessageBox.information(self, "温馨提示", "请选择需要执行的记录！", QMessageBox.Yes, QMessageBox.Yes)
+                return
+            self.replaceXMLAddData()
+        elif self.bg.checkedId() == 4:
+            # 获取左侧数据
+            self.getLeftSelectedTreeDataAction()
+            if len(self.leftSelectDatas) == 0:
+                QMessageBox.information(self, "温馨提示", "请选择需要执行的记录！", QMessageBox.Yes, QMessageBox.Yes)
+                return
+            self.interfaceXMLReplaceAddData()
+
+        try:
+            # 节点转为tree对象
+            tree = etree.ElementTree(self.rightRoot)
+            '''
+            各个参数含义如下：
+            1）第1个参数是xml的完整路径(包括文件名)；
+            2）pretty_print参数是否美化代码；
+            3）xml_declaration参数是否写入xml声明，就是我们看到xml文档第1行文字；
+            4）encoding参数很明显是保存的编码。
+            '''
+            tree.write(self.rightPath, pretty_print=True, xml_declaration=True, encoding='utf-8')
+            QMessageBox.information(self, "温馨提示", "xml生成成功！", QMessageBox.Yes, QMessageBox.Yes)
+
+            # 重新加载xml
+            self.readRightBTAction()
+        except Exception as err:
+            print('错误信息：{0}'.format(err))
+            QMessageBox.information(self, "温馨提示", "生成xml失败！", QMessageBox.Yes, QMessageBox.Yes)
+
     def retainData(self):
         for roadId, childList in self.leftSelectDatas.items():
             print(roadId, childList)
             for cindex in range(0, len(childList)):
                 child = childList[cindex]
                 self.insertToXML(roadId, child)
+
+    def retainXMLData(self):
+        for roadId, childList in self.leftSelectDatas.items():
+            print(roadId, childList)
+            for cindex in range(0, len(childList)):
+                child = childList[cindex]
+                self.insertToXMLByXML(roadId, child)
 
     def replaceAddData(self):
         for roadId, childList in self.leftSelectDatas.items():
@@ -464,12 +638,26 @@ class FileDiffs(QWidget, Ui_diffs):
                 child = childList[cindex]
                 self.replaceAddToXML(roadId, child)
 
+    def replaceXMLAddData(self):
+        for roadId, childList in self.leftSelectDatas.items():
+            print(roadId, childList)
+            for cindex in range(0, len(childList)):
+                child = childList[cindex]
+                self.replaceAddToXMLByXML(roadId, child)
+
     def interfaceReplaceAddData(self):
         for roadId, childList in self.leftSelectDatas.items():
             print(roadId, childList)
             for cindex in range(0, len(childList)):
                 child = childList[cindex]
                 self.interfaceReplaceAddToXML(roadId, child)
+
+    def interfaceXMLReplaceAddData(self):
+        for roadId, childList in self.leftSelectDatas.items():
+            print(roadId, childList)
+            for cindex in range(0, len(childList)):
+                child = childList[cindex]
+                self.interfaceXMLReplaceAddToXML(roadId, child)
 
     def rightDeleteSelectedNote(self):
         for roadId, childList in self.rightSelectDatas.items():
@@ -482,10 +670,17 @@ class FileDiffs(QWidget, Ui_diffs):
                     QMessageBox.information(self, "温馨提示", "请先选XML文件！", QMessageBox.Yes, QMessageBox.Yes)
                     return
 
-                objectsList = self.rightRoot.xpath("//OpenDriveData/road[@id='" + roadId + "']/objects")
-                objectList = self.rightRoot.xpath(
-                    "//OpenDriveData/road[@id='" + roadId + "']/objects/object[@id='" +
-                    id + "'and @type='" + type + "' and @name='" + name + "' ]")
+                if self.bg.checkedId() == 4:# 处理路口
+                    objectsList = self.rightRoot.xpath("//OpenDriveData/junction/links/link[@id='" + roadId + "']/objects")
+                    objectList = self.rightRoot.xpath(
+                        "//OpenDriveData/junction/links/link[@id='" + roadId + "']/objects/object[@id='" +
+                        id + "'and @type='" + type + "' and @name='" + name + "' ]")
+                else:
+                    objectsList = self.rightRoot.xpath("//OpenDriveData/road[@id='" + roadId + "']/objects")
+                    objectList = self.rightRoot.xpath(
+                        "//OpenDriveData/road[@id='" + roadId + "']/objects/object[@id='" +
+                        id + "'and @type='" + type + "' and @name='" + name + "' ]")
+
                 objectsList[0].remove(objectList[0])
 
     def insertToXML(self, roadId, child):
@@ -505,13 +700,50 @@ class FileDiffs(QWidget, Ui_diffs):
 
         # 从xml文件中查询是否存在该条数据
         roadList = self.rightRoot.xpath("//OpenDriveData/road[@id='" + roadId + "']")
-        objectList = self.rightRoot.xpath(
-            "//OpenDriveData/road[@id='" + roadId + "']/objects/object[@id='" +
-            id + "'and @type='" + type + "' and @name='" + name + "' ]")
-
+        # objectList = self.rightRoot.xpath(
+        #     "//OpenDriveData/road[@id='" + roadId + "']/objects/object[@id='" +
+        #     id + "'and @type='" + type + "' and @name='" + name + "' ]")
+        objectList = self.getRightObjectListByST(roadId, type, name, s, t)
         # xml文件中没有该条记录
         if len(objectList) == 0 and len(roadList) == 1:
             leftObjectList = self.leftRoot.xpath("//OpenDRIVE/road[@id='" + roadId + "']/objects/object[@id='" +
+                                                 id + "'and @type='" + type + "' and @name='" + name + "']")
+
+            rightObjectsList = self.rightRoot.xpath("//OpenDriveData/road[@id='" + roadId + "']/objects")
+
+            if len(rightObjectsList) == 0:  # right 端没有objects节点
+                objects = etree.SubElement(roadList[0], "objects")
+                objects.append(leftObjectList[0])
+            else:
+                rightObjectsList[0].append(leftObjectList[0])
+
+            # rightObjectsList[0].append(leftObjectList[0])
+
+    def insertToXMLByXML(self, roadId, child):
+        id = child["id"]
+        type = child["type"]
+        name = child["name"]
+        s = child["s"]
+        t = child["t"]
+        zOffset = child["zOffset"]
+        if self.rightRoot == None:
+            QMessageBox.information(self, "温馨提示", "请先选XML文件！", QMessageBox.Yes, QMessageBox.Yes)
+            return
+
+        if self.leftRoot == None:
+            QMessageBox.information(self, "温馨提示", "请先选xodr文件！", QMessageBox.Yes, QMessageBox.Yes)
+            return
+
+        # 从xml文件中查询是否存在该条数据
+        roadList = self.rightRoot.xpath("//OpenDriveData/road[@id='" + roadId + "']")
+        # objectList = self.rightRoot.xpath(
+        #     "//OpenDriveData/road[@id='" + roadId + "']/objects/object[@id='" +
+        #     id + "'and @type='" + type + "' and @name='" + name + "' ]")
+        objectList = self.getRightObjectListByST(roadId, type, name, s, t)
+
+        # xml文件中没有该条记录
+        if len(objectList) == 0 and len(roadList) == 1:
+            leftObjectList = self.leftRoot.xpath("//OpenDriveData/road[@id='" + roadId + "']/objects/object[@id='" +
                                                  id + "'and @type='" + type + "' and @name='" + name + "']")
 
             rightObjectsList = self.rightRoot.xpath("//OpenDriveData/road[@id='" + roadId + "']/objects")
@@ -541,9 +773,12 @@ class FileDiffs(QWidget, Ui_diffs):
 
         # 从xml文件中查询是否存在该条数据
         roadList = self.rightRoot.xpath("//OpenDriveData/road[@id='" + roadId + "']")
-        objectList = self.rightRoot.xpath(
-            "//OpenDriveData/road[@id='" + roadId + "']/objects/object[@id='" +
-            id + "'and @type='" + type + "' and @name='" + name + "']")
+        # objectList = self.rightRoot.xpath(
+        #     "//OpenDriveData/road[@id='" + roadId + "']/objects/object[@id='" +
+        #     id + "'and @type='" + type + "' and @name='" + name + "']")
+        # objectList = self.rightRoot.xpath(
+        #     "//OpenDriveData/road[@id='" + roadId + "']/objects/object[@type='" + type + "' and @name='" + name + "']")
+        objectList = self.getRightObjectListByST(roadId, type, name, s, t)
 
         # xml文件中没有该条记录
         if len(objectList) == 0 and len(roadList) == 1:  # id|name|type 不同 新增
@@ -558,6 +793,46 @@ class FileDiffs(QWidget, Ui_diffs):
 
         elif len(objectList) > 0 and len(roadList) == 1:  # id|name|type 相同 替换
             leftObjectList = self.leftRoot.xpath("//OpenDRIVE/road[@id='" + roadId + "']/objects/object[@id='" +
+                                                 id + "'and @type='" + type + "' and @name='" + name + "']")
+            rightObjectsList = self.rightRoot.xpath("//OpenDriveData/road[@id='" + roadId + "']/objects")
+            rightObjectsList[0].remove(objectList[0])
+            rightObjectsList[0].append(leftObjectList[0])
+
+    def replaceAddToXMLByXML(self, roadId, child):
+        id = child["id"]
+        type = child["type"]
+        name = child["name"]
+        s = child["s"]
+        t = child["t"]
+        zOffset = child["zOffset"]
+        if self.rightRoot == None:
+            QMessageBox.information(self, "温馨提示", "请先选XML文件！", QMessageBox.Yes, QMessageBox.Yes)
+            return
+
+        if self.leftRoot == None:
+            QMessageBox.information(self, "温馨提示", "请先选xodr文件！", QMessageBox.Yes, QMessageBox.Yes)
+            return
+
+        # 从xml文件中查询是否存在该条数据
+        roadList = self.rightRoot.xpath("//OpenDriveData/road[@id='" + roadId + "']")
+        # objectList = self.rightRoot.xpath(
+        #     "//OpenDriveData/road[@id='" + roadId + "']/objects/object[@id='" +
+        #     id + "'and @type='" + type + "' and @name='" + name + "']")
+        objectList = self.getRightObjectListByST(roadId, type, name, s, t)
+
+        # xml文件中没有该条记录
+        if len(objectList) == 0 and len(roadList) == 1:  # id|name|type 不同 新增
+            leftObjectList = self.leftRoot.xpath("//OpenDriveData/road[@id='" + roadId + "']/objects/object[@id='" +
+                                                 id + "'and @type='" + type + "' and @name='" + name + "']")
+            rightObjectsList = self.rightRoot.xpath("//OpenDriveData/road[@id='" + roadId + "']/objects")
+            if len(rightObjectsList) == 0:  # right 端没有objects节点
+                objects = etree.SubElement(roadList[0], "objects")
+                objects.append(leftObjectList[0])
+            else:
+                rightObjectsList[0].append(leftObjectList[0])
+
+        elif len(objectList) > 0 and len(roadList) == 1:  # id|name|type 相同 替换
+            leftObjectList = self.leftRoot.xpath("//OpenDriveData/road[@id='" + roadId + "']/objects/object[@id='" +
                                                  id + "'and @type='" + type + "' and @name='" + name + "']")
             rightObjectsList = self.rightRoot.xpath("//OpenDriveData/road[@id='" + roadId + "']/objects")
             rightObjectsList[0].remove(objectList[0])
@@ -580,9 +855,10 @@ class FileDiffs(QWidget, Ui_diffs):
 
         # 从xml文件中查询是否存在该条数据
         roadList = self.rightRoot.xpath("//OpenDriveData/junction/links/link[@id='" + roadId + "']")
-        objectList = self.rightRoot.xpath(
-            "//OpenDriveData/junction/links/link[@id='" + roadId + "']/objects/object[@id='" +
-            id + "'and @type='" + type + "' and @name='" + name + "']")
+        # objectList = self.rightRoot.xpath(
+        #     "//OpenDriveData/junction/links/link[@id='" + roadId + "']/objects/object[@id='" +
+        #     id + "'and @type='" + type + "' and @name='" + name + "']")
+        objectList = self.getRightObjectListByST(roadId, type, name, s, t)
 
         # xml文件中没有该条记录
         if len(objectList) == 0 and len(roadList) == 1:  # id|name|type 不同 新增
@@ -602,6 +878,46 @@ class FileDiffs(QWidget, Ui_diffs):
             rightObjectsList[0].remove(objectList[0])
             rightObjectsList[0].append(leftObjectList[0])
 
+    def interfaceXMLReplaceAddToXML(self, roadId, child):
+        id = child["id"]
+        type = child["type"]
+        name = child["name"]
+        s = child["s"]
+        t = child["t"]
+        zOffset = child["zOffset"]
+        if self.rightRoot == None:
+            QMessageBox.information(self, "温馨提示", "请先选XML文件！", QMessageBox.Yes, QMessageBox.Yes)
+            return
+
+        if self.leftRoot == None:
+            QMessageBox.information(self, "温馨提示", "请先选xodr文件！", QMessageBox.Yes, QMessageBox.Yes)
+            return
+
+        # 从xml文件中查询是否存在该条数据
+        roadList = self.rightRoot.xpath("//OpenDriveData/junction/links/link[@id='" + roadId + "']")
+        # objectList = self.rightRoot.xpath(
+        #     "//OpenDriveData/junction/links/link[@id='" + roadId + "']/objects/object[@id='" +
+        #     id + "'and @type='" + type + "' and @name='" + name + "']")
+        objectList = self.getRightObjectListByST(roadId, type, name, s, t)
+
+        # xml文件中没有该条记录
+        if len(objectList) == 0 and len(roadList) == 1:  # id|name|type 不同 新增
+            leftObjectList = self.leftRoot.xpath("//OpenDriveData/road[@id='" + roadId + "']/objects/object[@id='" +
+                                                 id + "'and @type='" + type + "' and @name='" + name + "']")
+            rightObjectsList = self.rightRoot.xpath("//OpenDriveData/junction/links/link[@id='" + roadId + "']/objects")
+            if len(rightObjectsList) == 0:  # right 端没有objects节点
+                objects = etree.SubElement(roadList[0], "objects")
+                objects.append(leftObjectList[0])
+            else:
+                rightObjectsList[0].append(leftObjectList[0])
+
+        elif len(objectList) > 0 and len(roadList) == 1:  # id|name|type 相同 替换
+            leftObjectList = self.leftRoot.xpath("//OpenDriveData/road[@id='" + roadId + "']/objects/object[@id='" +
+                                                 id + "'and @type='" + type + "' and @name='" + name + "']")
+            rightObjectsList = self.rightRoot.xpath("//OpenDriveData/junction/links/link[@id='" + roadId + "']/objects")
+            rightObjectsList[0].remove(objectList[0])
+            rightObjectsList[0].append(leftObjectList[0])
+
     def replaceData(self):
         try:
             for roadId, childList in self.leftSelectDatas.items():
@@ -610,7 +926,15 @@ class FileDiffs(QWidget, Ui_diffs):
         except Exception as err:
             print('错误信息：{0}'.format(err))
 
-    def replaceToXML(self, roadId):
+    def replaceXMLData(self):
+        try:
+            for roadId, childList in self.leftSelectDatas.items():
+                print(roadId, childList)
+                self.replaceToXMLByXML(roadId)
+        except Exception as err:
+            print('错误信息：{0}'.format(err))
+
+    def replaceToXMLByXML(self, roadId):
         try:
             if self.rightRoot == None:
                 QMessageBox.information(self, "温馨提示", "请先选XML文件！", QMessageBox.Yes, QMessageBox.Yes)
@@ -623,7 +947,7 @@ class FileDiffs(QWidget, Ui_diffs):
             # 从xml文件中查询是否存在该条数据
             roadList = self.rightRoot.xpath("//OpenDriveData/road[@id='" + roadId + "']")
             objectsList = self.rightRoot.xpath("//OpenDriveData/road[@id='" + roadId + "']/objects")
-            leftObjectsList = self.leftRoot.xpath("//OpenDRIVE/road[@id='" + roadId + "']/objects")
+            leftObjectsList = self.leftRoot.xpath("//OpenDriveData/road[@id='" + roadId + "']/objects")
 
             if len(leftObjectsList) > 0:
                 if len(roadList) == 1 and len(objectsList) != 0:
@@ -646,7 +970,7 @@ class FileDiffs(QWidget, Ui_diffs):
             QMessageBox.information(self, "温馨提示", "请先选XML文件！", QMessageBox.Yes, QMessageBox.Yes)
             return
 
-        # 获取左侧数据
+        # 获取选中的数据
         self.getRightSelectedTreeDataAction()
         if len(self.rightSelectDatas) == 0:
             QMessageBox.information(self, "温馨提示", "请选择需要删除的记录！", QMessageBox.Yes, QMessageBox.Yes)
@@ -677,13 +1001,14 @@ class FileDiffs(QWidget, Ui_diffs):
             return
 
     def leftFilterBTAction(self):
+        if self.leftRoot == None or self.leftRoot == "":
+            QMessageBox.information(self, "温馨提示", "请先选xodr文件！", QMessageBox.Yes, QMessageBox.Yes)
+            return
+
         parser = etree.XMLParser(remove_blank_text=True)
         xml = etree.parse(self.leftPath, parser)
         self.leftRoot = xml.getroot()  # 获取根节点
 
-        if self.leftRoot == None or self.leftRoot == "":
-            QMessageBox.information(self, "温馨提示", "请先选xodr文件！", QMessageBox.Yes, QMessageBox.Yes)
-            return
         # if self.rightRoot == None or self.rightRoot == "":
         #     QMessageBox.information(self, "温馨提示", "请先选XML文件！", QMessageBox.Yes, QMessageBox.Yes)
         #     return
@@ -694,9 +1019,69 @@ class FileDiffs(QWidget, Ui_diffs):
             id = self.leftRoadList[i]
             roadNote = QTreeWidgetItem(self.leftTreeWidget)
             roadNote.setText(0, id)
+            # roadNote.setCheckState(0, Qt.Checked)
+            roadNote.setCheckState(0, 0)
+
+            objectNameSelected = self.objectNameComboBox.currentText()
+            objectNameSelectedType = objectNameSelected.split(",")[0].strip()
+            if objectNameSelectedType == 'ALL':
+                objectList = self.leftRoot.xpath("//OpenDRIVE/road[@id='" + id + "']/objects/object")
+            else:
+                objectList = self.leftRoot.xpath(
+                    "//OpenDRIVE/road[@id='" + id + "']/objects/object[contains(@name ,'" + objectNameSelectedType + "')]")
+
+            for objectIndex in range(0, len(objectList)):
+                object = objectList[objectIndex]
+                objectId = object.xpath("@id")[0]
+                objectType = object.xpath("@type")[0]
+                objectName = object.xpath("@name")[0]
+                s = object.xpath("@s")[0]
+                t = object.xpath("@t")[0]
+                zOffset = object.xpath("@zOffset")[0]
+
+                # 子节点
+                child1 = QTreeWidgetItem()
+                child1.setText(0, objectId)
+                child1.setText(1, objectType)
+                child1.setText(2, objectName)
+                child1.setText(3, s)
+                child1.setText(4, t)
+                child1.setText(5, zOffset)
+                child1.setCheckState(0, 0)
+                # child1.setCheckState(0, Qt.Checked)
+                roadNote.addChild(child1)
+            self.leftTreeWidget.addTopLevelItem(roadNote)
+            self.leftTreeWidget.collapseAll()
+
+    def leftXMLFilterAction(self):
+        if self.leftRoot == None or self.leftRoot == "":
+            QMessageBox.information(self, "温馨提示", "请先选xodr文件！", QMessageBox.Yes, QMessageBox.Yes)
+            return
+
+        parser = etree.XMLParser(remove_blank_text=True)
+        xml = etree.parse(self.leftPath, parser)
+        self.leftRoot = xml.getroot()  # 获取根节点
+
+        # if self.rightRoot == None or self.rightRoot == "":
+        #     QMessageBox.information(self, "温馨提示", "请先选XML文件！", QMessageBox.Yes, QMessageBox.Yes)
+        #     return
+        self.getLeftXMLRoadList()
+        self.leftTreeWidget.clear()
+        self.leftRoadList.sort()
+        for i in range(0, len(self.leftRoadList)):
+            id = self.leftRoadList[i]
+            roadNote = QTreeWidgetItem(self.leftTreeWidget)
+            roadNote.setText(0, id)
             roadNote.setCheckState(0, Qt.Checked)
 
-            objectList = self.leftRoot.xpath("//OpenDRIVE/road[@id='" + id + "']/objects/object")
+            objectNameSelected = self.objectNameComboBox.currentText()
+            objectNameSelectedType = objectNameSelected.split(",")[0].strip()
+            if objectNameSelectedType == 'ALL':
+                objectList = self.leftRoot.xpath("//OpenDriveData/road[@id='" + id + "']/objects/object")
+            else:
+                objectList = self.leftRoot.xpath(
+                    "//OpenDriveData/road[@id='" + id + "']/objects/object[contains(@name ,'" + objectNameSelectedType + "')]")
+
             for objectIndex in range(0, len(objectList)):
                 object = objectList[objectIndex]
                 objectId = object.xpath("@id")[0]
@@ -720,13 +1105,13 @@ class FileDiffs(QWidget, Ui_diffs):
             self.leftTreeWidget.collapseAll()
 
     def rightFilterBTAction(self):
-        parserRight = etree.XMLParser(remove_blank_text=True)
-        xmlRight = etree.parse(self.rightPath, parserRight)
-        self.rightRoot = xmlRight.getroot()  # 获取根节点
-
         if self.rightRoot == None or self.rightRoot == "":
             QMessageBox.information(self, "温馨提示", "请先选XML文件！", QMessageBox.Yes, QMessageBox.Yes)
             return
+
+        parserRight = etree.XMLParser(remove_blank_text=True)
+        xmlRight = etree.parse(self.rightPath, parserRight)
+        self.rightRoot = xmlRight.getroot()  # 获取根节点
 
         parserRight = etree.XMLParser(remove_blank_text=True)
         xmlRight = etree.parse(self.rightPath, parserRight)
@@ -742,12 +1127,21 @@ class FileDiffs(QWidget, Ui_diffs):
             roadNote.setText(0, id)
             roadNote.setCheckState(0, 0)
 
-            if  self.bg.checkedId() == 4:
-                objectList = self.rightRoot.xpath("//OpenDriveData/junction/links/link[@id='" + id + "']/objects/object")
+            objectNameSelected = self.objectNameComboBox.currentText()
+            objectNameSelectedType = objectNameSelected.split(",")[0].strip()
+            if self.bg.checkedId() == 4:
+                if objectNameSelectedType == 'ALL':
+                    objectList = self.rightRoot.xpath(
+                        "//OpenDriveData/junction/links/link[@id='" + id + "']/objects/object")
+                else:
+                    objectList = self.rightRoot.xpath(
+                        "//OpenDriveData/junction/links/link[@id='" + id + "']/objects/object[contains(@name ,'" + objectNameSelectedType + "')]")
             else:
-                objectList = self.rightRoot.xpath("//OpenDriveData/road[@id='" + id + "']/objects/object")
-
-
+                if objectNameSelectedType == 'ALL':
+                    objectList = self.rightRoot.xpath("//OpenDriveData/road[@id='" + id + "']/objects/object")
+                else:
+                    objectList = self.rightRoot.xpath(
+                        "//OpenDriveData/road[@id='" + id + "']/objects/object[contains(@name ,'" + objectNameSelectedType + "')]")
 
             for objectIndex in range(0, len(objectList)):
                 object = objectList[objectIndex]
@@ -772,6 +1166,57 @@ class FileDiffs(QWidget, Ui_diffs):
             self.rightTreeWidget.addTopLevelItem(roadNote)
             # 树收起
             self.rightTreeWidget.collapseAll()
+
+    def getRightObjectListByST(self, roadId, type, name, s, t):
+        plusFlag = t.find("+")
+        fsFlagS = s.find("-")
+        fsFlagT = t.find("-")
+        substrS = 4
+        substrT = 4
+        if fsFlagT < 0:
+            substrT = 4
+            txx = t[0:substrT]
+        else:
+            substrT = 5
+            txx = t[0:substrT]
+
+        if fsFlagS < 0:
+            substrS = 4
+            sxx = s[0:substrS]
+        else:
+            substrS = 5
+            sxx = s[0:substrS]
+
+        txxf = float(txx)
+        sxxf = float(sxx)
+
+        t1 = txxf - 0.01
+        t2 = txxf + 0.01
+        s1 = sxxf - 0.01
+        s2 = sxxf + 0.01
+
+        ss1 = str(s1) + s[substrS:]
+        ss2 = str(s2) + s[substrS:]
+        tt1 = str(t1) + t[substrT:]
+        tt2 = str(t2) + t[substrT:]
+
+        if plusFlag > 0:
+            objectList = self.rightRoot.xpath(
+                "//OpenDriveData/road[@id='" + roadId + "']/objects/object[@type='" + type + "' and @name='" + name + "' and @s>'" + ss1 + "' and @s<'" + ss2 + "' and @t>'" + tt1 + "' and @t<'" + tt2 + "']")
+        else:
+            objectList = self.rightRoot.xpath(
+                "//OpenDriveData/road[@id='" + roadId + "']/objects/object[@type='" + type + "' and @name='" + name + "' and @s='" + s + "'  and @t='" + t + "']")
+
+        return objectList
+
+    def readConfig(self):
+        # 获取文件的当前路径（绝对路径）
+        cur_path = os.path.dirname(os.path.realpath(__file__))
+        # 获取config.ini的路径
+        config_path = os.path.join(cur_path, 'config.ini')
+        conf = configparser.ConfigParser()
+        conf.read(config_path, encoding='utf-8')
+        return conf
 
 
 if __name__ == '__main__':
