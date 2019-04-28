@@ -1195,10 +1195,34 @@ class FileDiffs(QWidget, Ui_diffs):
         s1 = sxxf - 0.01
         s2 = sxxf + 0.01
 
-        ss1 = str(s1) + s[substrS:]
-        ss2 = str(s2) + s[substrS:]
-        tt1 = str(t1) + t[substrT:]
-        tt2 = str(t2) + t[substrT:]
+        strt1 = str(t1)
+        strt2 = str(t2)
+        strs1 = str(s1)
+        strs2 = str(s2)
+
+        # 判断位数
+        if len(strs1) < substrS:
+            strs1 = strs1 + "0"
+        elif len(strs1) > substrS:
+            strs1 = strs1[0:-1]
+        if len(strs2) < substrS:
+            strs2 = strs2 + "0"
+        elif len(strs2) > substrS:
+            strs2 = strs2[0:-1]
+
+        if len(strt1) < substrT:
+            strt1 = strt1 + "0"
+        elif len(strt1) > substrT:
+            strt1 = strt1[0:-1]
+        if len(strt2) < substrT:
+            strt2 = strt2 + "0"
+        elif len(strt2) > substrT:
+            strt2 = strt2[0:-1]
+
+        ss1 = strs1 + s[substrS:]
+        ss2 = strs2 + s[substrS:]
+        tt1 = strt1 + t[substrT:]
+        tt2 = strt2 + t[substrT:]
 
         if plusFlag > 0:
             objectList = self.rightRoot.xpath(
